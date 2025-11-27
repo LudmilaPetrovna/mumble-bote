@@ -120,7 +120,7 @@ my $preproc=lc($_);
 $preproc=~s/[^a-zа-яё0-9]//gs;
 $preproc=~s/\s+/ /gs;
 
-my $hh=sha1($salt.encode_utf8($preproc).reverse($salt));
+my $hh=sha1(encode_utf8($salt.$preproc.reverse($salt)));
 my $nn=0;
 my $q;
 for($q=0;$q<5;$q++){
