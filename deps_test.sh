@@ -2,9 +2,12 @@
 
 ddate
 file deps_test.sh
-for q in {jpg,gif,png,webp};do convert -size 100x500 plasma: test.$q;rm -f test.$q;done
+for q in {jpg,gif,png,webp};do
+convert -size 100x500 plasma: test.$q
+identify test.$q
+rm -f test.$q
+done
 
-identify test.*
 curl --version
 curl_chrome110 --version
 
@@ -17,3 +20,4 @@ perl -e 'use IO::Socket::SSL'
 perl -e 'use JSON'
 perl -e 'use LWP::UserAgent'
 perl -e 'use URI::Escape'
+echo "Testing done"
