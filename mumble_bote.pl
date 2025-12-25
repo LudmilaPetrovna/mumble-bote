@@ -21,10 +21,18 @@ use feature 'state';
 
 require "./utils.pl";
 
+# Usage: mumble_bote.pl "Bot name"
+
 #options
-my $botName='Bote';
+my $useRandomNameSuffix=1;
+my $botName=$ARGV[0]||'Bote'.($useRandomNameSuffix?" ".int(rand()*10000):"");
 my $botServer='mumble.example.com:64738';
 my $useDebug=0;
+
+#path to certs
+my $dir=dirname(__FILE__); # working dir same as script file
+my $tlsCertFile=$dir.'/cert-'.md5_hex($botName).'.pem';
+my $tlsKeyFile=$dir.'/key-'.md5_hex($botName).'.pem';
 
 #good sosnolechka state
 binmode(STDOUT,":utf8");
@@ -37,15 +45,16 @@ my $currentChannel=0;
 my $rootChannel=0;
 my %sessions=();
 
-my $dir=dirname(__FILE__);
-chdir $dir;
+chdir $dir; # jump to working dir
 
+#grab fresh Proto-file
 if(!-s("Mumble.proto")){
 `wget https://github.com/mumble-voip/mumble/raw/refs/heads/master/src/Mumble.proto`;
 }
 
-if(!-s("cert.pem") || !-s("key.pem")){
-`openssl req  -nodes -newkey rsa:2048 -x509  -keyout $dir/key.pem -out $dir/cert.pem -days 36500 -subj "/CN=example.com"`
+#create certs for current server and nickname, if need
+if(!-s($tlsCertFile) || !-s($tlsKeyFile)){
+`openssl req  -nodes -newkey rsa:2048 -x509  -keyout "$tlsKeyFile" -out "$tlsCertFile" -days 36500 -subj "/CN=example.com"`
 }
 
 updateLogic();
@@ -61,11 +70,14 @@ if($useDebug){
 $IO::Socket::SSL::DEBUG=3;
 }
 
+
 my $sock=IO::Socket::SSL->new(
-SSL_cert_file=>$dir.'/cert.pem',
-SSL_key_file=>$dir.'/key.pem',
-PeerAddr=>$botServer,blocking=>0,SSL_verify_mode=>SSL_VERIFY_NONE) or die "Can't connect: $SSL_ERROR";
+SSL_cert_file=>$tlsCertFile,
+SSL_key_file=>$tlsKeyFile,
+PeerAddr=>$botServer,blocking=>0,SSL_verify_mode=>SSL_VERIFY_NONE) or die "Can't connect to $botServer: $SSL_ERROR\n\n";
 my $sel=IO::Select->new($sock);
+
+print "Connected to $botServer as $botName...\n";
 
 my $started_time=time();
 my $errors=0;
@@ -79,8 +91,6 @@ release=>"Broadcast chat",
 os=>"perl",
 os_version=>"linux"
 });
-
-
 
 while(1){
 

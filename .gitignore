@@ -9,6 +9,12 @@
 
 *.pm
 
+*.proto
+*.png
+*.jpg
+*.jpeg
+
+
 # Devel::Cover
 cover_db/
 

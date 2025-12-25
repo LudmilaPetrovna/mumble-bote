@@ -4,13 +4,14 @@
 
 # Инсталляция
 
-Для дебиан-подобных дистрибутивов надо поставить немного зависимостей:
+Для дебиан-подобных дистрибутивов надо поставить немного зависимостей, здесь как отдельные утилиты, так и перловые зависимости, вынесенные в отдельные пакеты:
 ```
-apt-get install imagemagick imagemagick-common ddate
+apt-get install imagemagick imagemagick-common ddate wget curl
+apt-get install libdigest-sha-perl libcryptx-perl libfile-slurp-perl libgoogle-protocolbuffers-perl libhtml-parser-perl libio-socket-ssl-perl libjson-perl libwww-perl liburi-perl
 ```
-В зависимости входит и [https://github.com/lwthiker/curl-impersonate](https://github.com/lwthiker/curl-impersonate), который собирается ручками. Но если оно не нужно, то можно и без него.
+В зависимости входит и [https://github.com/lwthiker/curl-impersonate](https://github.com/lwthiker/curl-impersonate), который собирается ручками. Но если оно не нужно, то можно и без него, просто замените на обычный `curl`.
 
-Затем надо поставить парочку перловых зависимостей:
+Если в вашем дистрибутиве нету всех перловых зависимостей, то недостающие можно поставить из CPAN:
 ```
 cpan -i Digest::SHA1
 cpan -i File::Slurp
@@ -27,7 +28,14 @@ my $botName='Bote';
 my $botServer='mumble.example.com:64738';
 my $useDebug=0;
 ```
-Других настроек у бота нет, но вроде бы и не нужно более.
+Других настроек у бота нет, но вроде бы и не нужно более. Пути к сертификатам можно оставить дефолтные.
+
+Имя боту задается как значение переменной и может быть динамическим, к примеру:
+```
+my $useRandomNameSuffix=1;
+my $botName=$ARGV[0]||'Bote'.($useRandomNameSuffix?" ".int(rand()*10000):"");
+```
+Такое имя может быть задано из командной строки, а если в ней ничего не указано, то будет использовано слово "Bote" и если определена переменная `$useRandomNameSuffix`, то к имени будет добавлено случайное цифровое значение. Полезно для запуска множества ботов из одной директории.
 
 Бот автоматически сгенерирует себе сертификаты и аватарку. При первом запуске он скачает себе `Mumble.proto` с гитхаба и из него сделает себе модуль.
 
