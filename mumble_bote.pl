@@ -17,6 +17,7 @@ use MIME::Base64;
 use URI::Escape qw( uri_escape );
 use LWP::UserAgent;
 use HTML::Entities;
+use Time::HiRes qw(gettimeofday);
 use feature 'state';
 
 require "./utils.pl";
@@ -149,6 +150,31 @@ close(hd);
 }
 
 if($packet_type==1){ #MumbleProto::UDPTunnel
+
+if($useDebug){
+# log md5 of voices packet
+my($type,$target,$session,$seq,$opus_size);
+my $type_target=unpack("C",substr($packet_payload,0,1));
+my $type=$type_target>>5;
+my $target=$type_target&0x1F;
+my $pos=1;
+my($val,$adv);
+($val,$adv)=varint(substr($packet_payload,$pos,16));
+$pos+=$adv;
+$session=$val;
+($val,$adv)=varint(substr($packet_payload,$pos,16));
+$pos+=$adv;
+$seq=$val;
+($val,$adv)=varint(substr($packet_payload,$pos,16));
+$pos+=$adv;
+$opus_size=$val;
+my $sum=md5_hex(substr($packet_payload,$pos));
+my($seconds,$microseconds)=gettimeofday();
+open(ll,">>session-".$session.".log");
+print ll "$seconds.$microseconds: packet seq:$seq, md5:$sum\n";
+close(ll);
+}
+
 next;
 }
 

@@ -13,6 +13,8 @@
 *.png
 *.jpg
 *.jpeg
+*.pem
+*.log
 
 
 # Devel::Cover
