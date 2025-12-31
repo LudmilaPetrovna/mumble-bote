@@ -12,7 +12,7 @@ binmode(STDERR,":utf8");
 
 
 my $botName='Bote';
-my $botServer='brokensouls.wiki:64738';
+my $botServer='example.com:64738';
 
 my $currentChannel=0;
 my $rootChannel=0;
