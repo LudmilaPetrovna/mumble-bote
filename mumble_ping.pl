@@ -7,6 +7,89 @@ use Time::HiRes qw(time usleep);
 use Net::Ping;
 use Data::Dumper;
 use File::Slurp;
+use DBI;
+use POSIX qw(setsid);
+
+
+sub init_db{
+    my ($dbfile) = @_;
+    print STDERR "Opening $dbfile database...\n";
+    my $dbh = DBI->connect(
+        "dbi:SQLite:dbname=$dbfile",
+        "",
+        "",
+        {
+            RaiseError => 1,
+            AutoCommit => 1,
+        }
+    );
+
+    $dbh->do(q{
+        CREATE TABLE IF NOT EXISTS samples (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts        INTEGER NOT NULL,
+            server    TEXT NOT NULL,
+            ping_ms   REAL,
+            users     INTEGER,
+            max_users INTEGER
+        )
+    });
+
+    $dbh->do(q{
+        CREATE INDEX IF NOT EXISTS idx_samples_server_ts
+        ON samples(server, ts)
+    });
+
+    my $sth = $dbh->prepare(q{
+        INSERT INTO samples (ts, server, ping_ms, users, max_users)
+        VALUES (?, ?, ?, ?, ?)
+    });
+
+    return($dbh,$sth);
+}
+
+sub run_daemon {
+    my (%cfg) = @_;
+    my ($dbh,$sth) = init_db($cfg{dbfile});
+    my $server_id = "$cfg{host}:$cfg{port}";
+    print STDERR "Pinging $server_id and save to database...\n";
+
+    while (1) {
+        my $t0 = time();
+
+        my $res = check_mumble_server(
+            host => $cfg{host},
+            port => $cfg{port},
+	    udp_count => 1,
+	    icmp_count => 0,
+	    timeout => 5
+        );
+
+        if ($res) {
+print "$t0: $server_id ($res->{users}/$res->{max_users}), $res->{udp_ping_ms}{min}ms\n";
+    $sth->execute(
+        int($t0),
+        $server_id,
+        $res->{udp_ping_ms}{min},
+        $res->{users},
+        $res->{max_users},
+    );
+
+        } else {
+    $sth->execute(
+        int($t0),
+        $server_id,
+                ping_ms   => undef,
+                users     => undef,
+                max_users => undef,
+            );
+        }
+sleep(1);
+
+    }
+}
+
+
 
 sub decode_mumble_version {
     my ($v) = @_;
@@ -83,7 +166,8 @@ sub check_mumble_server {
     #
     # ICMP ping via /bin/ping
     #
-    my @icmp_rtt;
+    my @icmp_rtt=();
+if($icmp_count>0){
     my $cmd = sprintf(
         "ping -n -c %d -W %d %s 2>/dev/null",
         $icmp_count,
@@ -104,6 +188,7 @@ $ip=$1;
     }
 
     @icmp_rtt = sort { $a <=> $b } @icmp_rtt;
+}
 
     return {ip=>$ip,
         host      => $host,
@@ -128,11 +213,18 @@ $ip=$1;
 
 #print Dumper(check_mumble_server("host"=>"127.0.0.1","port"=>64777));
 
-my $addr=$ARGV[0];
-if(!$addr){die "Usage: ".__FILE__." mumble://127.0.0.1:64738\n\n";}
+my($addr,$database)=@ARGV;
+my($host,$port);
+if(!$addr){die "Usage: ".__FILE__." mumble://127.0.0.1:64738 [database.sqlite]\n\n";}
 
 if($addr=~/mumble:\/\/([^ :]+):(\d+)/){
-my($host,$port)=($1,$2);
+($host,$port)=($1,$2);
+}
+
+if(defined $database && $database=~/\.sqlite/){
+run_daemon(host=>$host,port=>$port,dbfile=>$database);
+} else {
+
 my $res=Dumper(check_mumble_server(host=>$host,port=>$port));
 #rite_file('results/'.$host.'-'.$port,$res);
 print $res;

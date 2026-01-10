@@ -15,7 +15,7 @@
 *.jpeg
 *.pem
 *.log
-
+*.sqlite
 
 # Devel::Cover
 cover_db/
