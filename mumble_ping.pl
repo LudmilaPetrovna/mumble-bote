@@ -79,9 +79,7 @@ print "".int($t0).": $server_id ($res->{users}/$res->{max_users}), $res->{udp_pi
     $sth->execute(
         int($t0),
         $server_id,
-                ping_ms   => undef,
-                users     => undef,
-                max_users => undef,
+	undef,undef,undef
             );
         }
 sleep(1);
