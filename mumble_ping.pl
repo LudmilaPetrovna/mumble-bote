@@ -65,8 +65,8 @@ sub run_daemon {
 	    timeout => 5
         );
 
-        if ($res) {
-print "$t0: $server_id ($res->{users}/$res->{max_users}), $res->{udp_ping_ms}{min}ms\n";
+        if ($res && $res->{max_users}) {
+print "".int($t0).": $server_id ($res->{users}/$res->{max_users}), $res->{udp_ping_ms}{min}ms\n";
     $sth->execute(
         int($t0),
         $server_id,
