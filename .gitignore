@@ -17,6 +17,8 @@
 *.log
 *.sqlite
 
+cache/
+
 # Devel::Cover
 cover_db/
 

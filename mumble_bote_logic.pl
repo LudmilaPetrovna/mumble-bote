@@ -217,8 +217,10 @@ my $tag="";
 my $safe=isImageSafe($src);
 if($safe){
 my $tmp='/dev/shm/tmp-image-'.time().'-'.rand().rand().rand().rand().rand().".jpg";
-`convert "$src" -trim -resize 370x500\\\> -quality 50 "$tmp"`;
+`convert "$src"[0] -trim -resize 370x500\\\> -quality 50 "$tmp"`;
+if(-s($tmp)){
 $tag='<br /><img src="data:image/JPEG;base64,'.uri_escape(encode_base64(read_file($tmp),'')).'" />';
+}
 unlink($tmp);
 }
 return $tag;
