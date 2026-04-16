@@ -16,20 +16,20 @@ apt-get install libdigest-sha-perl libcryptx-perl libfile-slurp-perl libgoogle-p
 cpan -i Digest::SHA1
 cpan -i File::Slurp
 ```
-Для тестирования, что все установлено хорошо, можно запустить `./deps_test.sh`, оно не должно сыпать ошибками
+Для тестирования, что все установлено хорошо, можно запустить `./deps_test.sh`, оно не должно сыпать ошибками. Просто запустите файл, не надо писать `sh ./deps_test.sh`, а просто `./deps_test.sh`, это важно.
 
-Чтобы сервис стартовал автоматически, можно воспользоваться `systemd` и поместить прилагаемый файл `bote.service` в `/etc/systemd/system`
+Чтобы сервис стартовал автоматически, можно воспользоваться `systemd` и поместить прилагаемый файл `bote.service` в `/etc/systemd/system`, затем ему надо сначала сделать `enable`, а потом уже `start`.
 
 # Настройка бота
 
-Открываем файл `mumble_bote.pl` и правим в его начале некоторые переменную `$CONFIG` по своему вкусу:
+Открываем файл `mumble_bote.pl` и правим в его начале переменную `$CONFIG` по своему вкусу:
 ```
 #options
 our $CONFIG={
     dir=>dirname(__FILE__), # working dir same as script file
     botName=>$ARGV[0]//'Bote',
     avatar_gen=>'./avatar-test/avatar5.sh',
-    logic=>'mumble_bote_simple_console.pl',
+    logic=>'mumble_bote_simple_console.pl',  # или mumble_bote_logic.pl
     ...
 }
 ```
