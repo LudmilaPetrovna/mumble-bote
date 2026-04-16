@@ -43,7 +43,7 @@ our $CONFIG={
 
 Вот примеры аватарок от разных генераторов (самый левый - это avatar5.sh, самый правый - это avatar8.sh):
 
-![./imgs/avatar-samples.jpg](./imgs/avatar-samples.jpg)
+![./imgs/avatar_samples.jpg](./imgs/avatar_samples.jpg)
 
 # Команды бота
 
