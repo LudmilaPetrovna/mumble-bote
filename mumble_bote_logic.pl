@@ -17,6 +17,8 @@ use HTML::Entities;
 
 require "./decode_unknown.pl";
 
+our $CONFIG;
+
 my @history; # last 10 messages
 my %activity;# last users for 24 hours
 my $removeLinksRE="";
@@ -45,7 +47,8 @@ sendChatMessageText("Mumble chat sync service started at ".$date);
 #set avatar
 my $dir=dirname(__FILE__);
 if(!-s('avatar.jpg')){
-`convert -colorspace gray -size 32x32 plasma:white-black -swirl -300 -negate -level 30%,70% -colorspace srgb avatar.jpg`;
+#`convert -colorspace gray -size 32x32 plasma:white-black -swirl -300 -negate -level 30%,70% -colorspace srgb avatar.jpg`;
+`bash "$CONFIG->{avatar_gen}" "$CONFIG->{tlsCertFile}"`;
 }
 setAvatar(scalar read_file('avatar.jpg'));
 }
@@ -91,6 +94,9 @@ $cmd=~s/^!/%/gs;
 if($main::useDebug){
 print "Processing message: ($from,$text,$channel_id,$is_private)\n";
 }
+
+#don't talk to history:
+if($text=~/Последние 10 сообщений чата:|За последние сутки тут были:/){return;}
 
 #adding to activity
 $activity{$from}=time();

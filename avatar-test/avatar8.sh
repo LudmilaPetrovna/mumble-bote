@@ -1,8 +1,12 @@
-TMP=$(mktemp -d) && \
-openssl rsa -in key.pem -outform DER 2>/dev/null >$TMP/k.der && \
-openssl dgst -sha256 -binary $TMP/k.der | head -c16 >$TMP/Y && \
-openssl dgst -md5    -binary $TMP/k.der | head -c16 >$TMP/Cb && \
-openssl dgst -sha1   -binary $TMP/k.der | head -c16 >$TMP/Cr && \
+TMP="tmp" && mkdir -p "$TMP"
+
+openssl rsa -in "$1" -outform DER 2>/dev/null >$TMP/k.der
+openssl dgst -sha256 -binary $TMP/k.der | head -c16 >$TMP/Y
+openssl dgst -md5    -binary $TMP/k.der | head -c16 >$TMP/Cb
+openssl dgst -sha1   -binary $TMP/k.der | head -c16 >$TMP/Cr
+
+md5sum $TMP/k.der
+
 H=$(openssl dgst -sha1 -binary $TMP/k.der | xxd -p | tr -d '\n') && \
 SW=$((16#${H:0:2}-128)) && \
 WA=$((16#${H:2:2}%4)) && \
@@ -21,8 +25,8 @@ convert \
 -swirl $((-SW)) \
 -modulate 100,160,100 \
 -filter point -resize 32x32! \
-avatar.png
+avatar.jpg
 
 
-#rm -rf "$TMP"
+rm -rvf "$TMP/"{Y,Cb,Cr,k.der}
 #

@@ -24,16 +24,66 @@ require "./utils.pl";
 
 # Usage: mumble_bote.pl "Bot name"
 
+# profile to be like Windows Client:
+#os=>"Windows",
+#os_version=>"Windows 10 Pro 2009 19045.3803 [x64]",
+#version=>0x104FF, # 1.4.255
+#release=>"1.4.287",
+#iam_the_bot=>0,
+
+# profile to be like Android Client:
+#os=>"Android",
+#os_version=>"16",
+#version=>0x10205, # 1.2.5
+#release=>"Mumla 3.7.3",
+#iam_the_bot=>0,
+
+
 #options
-my $useRandomNameSuffix=1;
-my $botName=$ARGV[0]||'Bote'.($useRandomNameSuffix?" ".int(rand()*10000):"");
-my $botServer='mumble.example.com:64738';
-my $useDebug=0;
+our $CONFIG={
+dir=>dirname(__FILE__), # working dir same as script file
+botName=>$ARGV[0]//'Bote',
+avatar_gen=>'./avatar-test/avatar5.sh',
+logic=>'mumble_bote_logic.pl',
+
+version=>0x10300, # 1.3.0
+release=>"Broadcast chat",
+os=>"perl",
+os_version=>"linux",
+iam_the_bot=>1,
+
+opus=>1,
+celt_versions=>-2147483637, #FFFFFFFF8000000B, # 0.7.0
+
+botServer=>'mumble.example.com:64738',
+useDebug=>0,
+useTrafficTransportDump=>0
+};
+
+# profiles to generate SSL certs
+our $PROFILES={
+    Mumla=>{
+        days=>7300,
+        subject=>"/CN=Humla Client",
+        serial=>1
+    },
+    Mumble=>{
+        days=>7300,
+        subject=>"/CN=Mumble User",
+        serial=>1
+    },
+    Web=>{
+        days=>36500,
+        subject=>"/CN=example.com",
+        serial=>123
+    }
+};
+our $CURSSL=$PROFILES->{Mumla};
 
 #path to certs
-my $dir=dirname(__FILE__); # working dir same as script file
-my $tlsCertFile=$dir.'/cert-'.md5_hex($botName).'.pem';
-my $tlsKeyFile=$dir.'/key-'.md5_hex($botName).'.pem';
+my $namehex=md5_hex($CONFIG->{botName});
+$CONFIG->{tlsCertFile}=$CONFIG->{dir}.'/cert-'.$namehex.'.pem';
+$CONFIG->{tlsKeyFile}=$CONFIG->{dir}.'/key-'.$namehex.'.pem';
 
 #good sosnolechka state
 binmode(STDOUT,":utf8");
@@ -46,7 +96,7 @@ my $currentChannel=0;
 my $rootChannel=0;
 my %sessions=();
 
-chdir $dir; # jump to working dir
+chdir $CONFIG->{dir}; # jump to working dir
 
 #grab fresh Proto-file
 if(!-s("Mumble.proto")){
@@ -54,11 +104,12 @@ if(!-s("Mumble.proto")){
 }
 
 #create certs for current server and nickname, if need
-if(!-s($tlsCertFile) || !-s($tlsKeyFile)){
-`openssl req  -nodes -newkey rsa:2048 -x509  -keyout "$tlsKeyFile" -out "$tlsCertFile" -days 36500 -subj "/CN=example.com"`
+if(!-s($CONFIG->{tlsCertFile}) || !-s($CONFIG->{tlsKeyFile})){
+`openssl req -nodes -newkey rsa:2048 -x509 -keyout "$CONFIG->{tlsKeyFile}" -out "$CONFIG->{tlsCertFile}" -sha1 -set_serial $CURSSL->{serial} -days $CURSSL->{days} -subj "$CURSSL->{subject}"`;
 }
 
 updateLogic();
+
 
 my @packet_types=(MumbleProto::Version,MumbleProto::UDPTunnel,MumbleProto::Authenticate,
 MumbleProto::Ping,MumbleProto::Reject,MumbleProto::ServerSync,MumbleProto::ChannelRemove,MumbleProto::ChannelState,
@@ -67,18 +118,18 @@ MumbleProto::UserRemove,MumbleProto::UserState,MumbleProto::BanList,MumbleProto:
 
 Google::ProtocolBuffers->parsefile("Mumble.proto",{generate_code=>'Mumble.pm',create_accessors=>1,follow_best_practice=>1});
 
-if($useDebug){
+if($CONFIG->{useDebug}){
 $IO::Socket::SSL::DEBUG=3;
 }
 
 
 my $sock=IO::Socket::SSL->new(
-SSL_cert_file=>$tlsCertFile,
-SSL_key_file=>$tlsKeyFile,
-PeerAddr=>$botServer,blocking=>0,SSL_verify_mode=>SSL_VERIFY_NONE) or die "Can't connect to $botServer: $SSL_ERROR\n\n";
+SSL_cert_file=>$CONFIG->{tlsCertFile},
+SSL_key_file=>$CONFIG->{tlsKeyFile},
+PeerAddr=>$CONFIG->{botServer},blocking=>0,SSL_verify_mode=>SSL_VERIFY_NONE) or die "Can't connect to $CONFIG->{botServer}: $SSL_ERROR\n\n";
 my $sel=IO::Select->new($sock);
 
-print "Connected to $botServer as $botName...\n";
+print "Connected to $CONFIG->{botServer} as $CONFIG->{botName}...\n";
 
 my $started_time=time();
 my $errors=0;
@@ -87,10 +138,11 @@ my $passed_time;
 my $last_ping=0;
 
 sendPacket(0,MumbleProto::Version,{
-version=>66304,
-release=>"Broadcast chat",
-os=>"perl",
-os_version=>"linux"
+version=>$CONFIG->{version},
+version_v1=>$CONFIG->{version},
+release=>$CONFIG->{release},
+os=>$CONFIG->{os},
+os_version=>$CONFIG->{os_version}
 });
 
 while(1){
@@ -124,7 +176,7 @@ next;
 }
 
 my($packet_type,$packet_len)=unpack("nN",$packet_head);
-if($useDebug){
+if($CONFIG->{useDebug}){
 print "got packet ($packet_type,$packet_len)\n";
 }
 if($packet_type>25 || $packet_len>=0xFFFFFF){
@@ -138,20 +190,29 @@ if($packet_len>=0xFFFFFF){die "Too big packet: $packet_len (type: $packet_type)!
 do{
 $packet_payload.=readNBytes($packet_len-$packet_payload_len);
 $packet_payload_len=length($packet_payload);
-if($useDebug){
+if($CONFIG->{useDebug}){
 print "Got packet $packet_type ($packet_types[$packet_type]), len $packet_len bytes, we have ".$packet_payload_len."\n";
 }
 } while($packet_payload_len!=$packet_len);
 
-if($useDebug){
+if($CONFIG->{useDebug}){
 open(hd,"|hexdump -C");
 print hd substr($packet_payload,0,1024);
 close(hd);
 }
 
+if($CONFIG->{useTrafficTransportDump}){
+if($packet_type!=1 && $packet_type!=3){ #skip packets 1 (voice) and 3 (ping)
+open(td,">>traffic_dump-".get_human_date(time()).".mumble");
+print td pack("III",time(),$packet_type,$packet_len).$packet_payload;
+close(td);
+}
+}
+
+
 if($packet_type==1){ #MumbleProto::UDPTunnel
 
-if($useDebug){
+if($CONFIG->{useDebug}){
 # log md5 of voices packet
 my($type,$target,$session,$seq,$opus_size);
 my $type_target=unpack("C",substr($packet_payload,0,1));
@@ -192,18 +253,19 @@ next;
 }
 
 
-if($useDebug){
+if($CONFIG->{useDebug}){
 print "We got from server $packet_type ($packet_types[$packet_type]) ($packet_len bytes), ".ref($msg).Dumper($msg);
 }
 
 
 if(ref($msg) eq "MumbleProto::Version"){
 sendPacket(2,MumbleProto::Authenticate,{
-username=>$botName,
+username=>$CONFIG->{botName},
 password=>"",
 #tokens=>'',
-celt_versions=>-2147483637,
-opus=>true
+celt_versions=>$CONFIG->{celt_versions},
+opus=>$CONFIG->{opus},
+client_type=>$CONFIG->{iam_the_bot}
 });
 next;
 }
@@ -217,22 +279,22 @@ next;
 }
 
 if(ref($msg) eq "MumbleProto::ServerConfig"){
-if($useDebug){
+if($CONFIG->{useDebug}){
 print "Server config: ".$msg->{max_users}." users, ".($msg->{allow_html}?"with":"NO")." HTML, max msg size:".$msg->{message_length}.", max image:".$msg->{image_message_length}."\n";
 }
 next;
 }
 
 if(ref($msg) eq "MumbleProto::UserState"){
-my $is_enter=exists $sessions{$msg->{session}}?0:1;
+my $is_enter=exists $sessions{$msg->{session}}?2:1;
 if(!$connected){$is_enter=2;}
 if(defined $msg->{name}){
 $sessions{$msg->{session}}=decode_utf8($msg->{name});
 }
-processPresence($sessions{$msg->{session}},$is_enter,$msg->{session});
+    processPresence($sessions{$msg->{session}},$is_enter,$msg->{session});
 if($msg->{session}==$currentSession && defined $msg->{channel_id}){
 $currentChannel=$msg->{channel_id};
-if($useDebug){
+if($CONFIG->{useDebug}){
 print "Bot changed channel to $currentChannel\n";
 }
 #fix me
@@ -243,11 +305,11 @@ next;
 }
 
 if(ref($msg) eq "MumbleProto::UserRemove"){
-delete $sessions{$msg->{session}};
-processPresence($sessions{$msg->{session}},0,$msg->{session});
+processPresence(exists $msg->{name}?$msg->{name}:$sessions{$msg->{session}},0,$msg->{session});
 if($currentSession == $msg->{session}){
 die "we was kicked/banned/removed: \"".$msg->{reason}."\"";
 }
+delete $sessions{$msg->{session}};
 next;
 }
 
@@ -266,7 +328,7 @@ if(ref($msg) eq "MumbleProto::ChannelState"){
 if(!exists $msg->{parent}){
 #$msg->{can_enter}!=0 && $msg->{is_enter_restricted}!=1 && 
 $rootChannel=$msg->{channel_id};
-if($useDebug){
+if($CONFIG->{useDebug}){
 print "Setting ROOT to $rootChannel\n";
 }
 }
@@ -277,7 +339,7 @@ next;
 if(ref($msg) eq "MumbleProto::ServerSync"){
 my $welcome=$msg->{welcome_text}." (max bandwidth: ".$msg->{max_bandwidth}.")";
 $welcome=~s/<[^>]+>//gs;
-if($useDebug){
+if($CONFIG->{useDebug}){
 print "Welcome message: $welcome\n";
 }
 $connected=1;
@@ -287,8 +349,6 @@ updateLogic();
 processHello();
 next;
 }
-
-
 
 }
 
@@ -411,7 +471,7 @@ return($ret,$p);
 
 sub setAvatar{
 my $texture=shift;
-if($useDebug){
+if($CONFIG->{useDebug}){
 print "SELF: setting avatar ".md5_hex($texture).", ".length($texture)." bytes\n";
 }
 sendPacket(9,MumbleProto::UserState,{texture=>$texture,session=>$currentSession});
@@ -439,14 +499,14 @@ die "Can't write to socket!";
 }
 $offset+=$actual;
 }
-if($useDebug){
+if($CONFIG->{useDebug}){
 print "Sending packet: ".Dumper($data);
 }
 }
 
 sub updateLogic{
 state $lastInited=-1;
-my $logicFile=dirname(__FILE__).'/mumble_bote_logic.pl';
+my $logicFile=dirname(__FILE__).'/'.$CONFIG->{logic};
 my $mtime=(stat($logicFile))[9];
 if($mtime>$lastInited){
 do $logicFile;
