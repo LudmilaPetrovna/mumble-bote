@@ -189,17 +189,19 @@ my $page=$rs->decoded_content;
 
 sub curl{
 my $url=shift;
+$url=encode_utf8($url);
+$url=~s/[<>\|\{\}\$\@\"\']+//gs;
 my $hash=md5_hex($url);
 my $file='cache/'.substr($hash,0,2).'/'.substr($hash,2,2).'/'.substr($hash,4);
 if(!-s($file)){
 make_path(dirname($file));
 sendPing();
-`curl_chrome110 --max-redirs 2 -m15 -sL "$url" -o $file`;
+`curl_chrome110 --limit-rate 350k --max-redirs 2 --proto =http,https --proto-redir =http,https -m15 -sL "$url" -o "$file"`;
 }
 if(!-s($file)){
 return;
 }
-return(read_file($file));
+return(substr(read_file($file),0,5000000));
 }
 
 
@@ -241,7 +243,7 @@ my $page=curl($link);
 my %props=();
 
 if(!$page){
-$page="хост лежит и не дышит";
+$page="По ссылке ничего не скачалось";
 return($page);
 }
 
@@ -249,7 +251,7 @@ if($page=~/"videoId":"[^\"]+","title":"([^\"]+)",/is){
 $props{title}=$1;
 }
 
-if($page=~/<titl[^>]+>([^<]+)/is){
+if($page=~/<titl[^>]{1,150}>([^<]+)/is){
 $props{title}=$1;
 }
 
@@ -263,7 +265,7 @@ $props{desc}=json2html($2);
 #$props{img}=$1;
 #}
 
-while($page=~/(<(meta|link)[^>]+>)/gsi){
+while($page=~/(<(meta|link)[^>]{1,550}>)/gsi){
 $tag=$1;
 if($tag=~s/thumbnailUrl|image_src|twitter:image|og:image//si){
 if($tag=~/(content|href)\s*=\s*\"([^<>\"]+)\"/si){
@@ -291,7 +293,7 @@ if(length($1)>length($props{site})){$props{site}=$1;}
 
 }
 
-print Dumper(\%props);
+#print Dumper(\%props);
 
 my $title=decode_entities(decodeUnknown($props{title}));
 $title=~s/\s+/ /gs;
@@ -304,9 +306,10 @@ $props{img}='https://i.ytimg.com/vi/'.$3.'/sddefault.jpg';
 }
 
 if($props{img}){
-my $piclink=$props{img};
-my $pic;
 $props{img}=undef;
+my $piclink=$props{img};
+my $pic_file='/dev/shm/temp____'.rand().rand().rand().rand().'.jpeg';
+my $pic;
 eval{
 print "Loading pic $piclink\n";
 $pic=curl($piclink);
@@ -315,27 +318,30 @@ $pic=curl($piclink);
 #print "Loading fastpic $1\n";
 #$pic=curl($1);
 #}
-write_file("/dev/shm/temp.jpeg",$pic);
-$props{img}=getImgTag('/dev/shm/temp.jpeg');
+write_file($pic_file,$pic);
+$props{img}=getImgTag($pic_file);
 };
+unlink($pic_file);
 }
 
 
 
 if(!$props{title}){
 print "Perform file magic test\n";
-write_file("/dev/shm/magicfiletest",$page);
-$page=decode_utf8(`file -z -b -k /dev/shm/magicfiletest`);
+my $magic_file='/dev/shm/magicfiletest_'.rand().rand().rand().rand().rand().rand().rand();
+write_file($magic_file,substr($page,0,1000000));
+$page=decode_utf8(`file -z -b -k $magic_file`);
 $page=~s/\/dev\/\S+|, CORRUPTED//gs;
-$page=~s/[\d\.]+KiB//gs;
+$page=~s/[\d\.]{1,15}KiB//gs;
 $page=~s/\s+$//s;
 
 if($page=~/image/i){
-$page=decode_utf8(`identify /dev/shm/magicfiletest| tr "\n" " " | cut -d" " -f1-3`)." ".$page;
+$page=decode_utf8(`identify $magic_file| tr "\n" " " | cut -d" " -f1-3`)." ".$page;
 $page=~s/\/dev\S+|, CORRUPTED//gs;
 $page=~s/[\d\.]+KiB//gs;
 $page.=getImgTag('/dev/shm/magicfiletest');
 }
+unlink($magic_file);
 return($page);
 }
 
