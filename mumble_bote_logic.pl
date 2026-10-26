@@ -190,7 +190,7 @@ my $page=$rs->decoded_content;
 sub curl{
 my $url=shift;
 $url=encode_utf8($url);
-$url=~s/[<>\|\{\}\$\@\"\']+//gs;
+$url=~s/[<>\|\{\}\$\@\"\'\`]+//gs; #`
 my $hash=md5_hex($url);
 my $file='cache/'.substr($hash,0,2).'/'.substr($hash,2,2).'/'.substr($hash,4);
 if(!-s($file)){
